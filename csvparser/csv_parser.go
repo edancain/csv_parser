@@ -2,7 +2,6 @@ package csvparser
 
 import (
 	"bufio"
-	"encoding/csv"
 	"fmt"
 	"io"
 	"strconv"
@@ -17,155 +16,129 @@ type CSVParser struct {
 }
 
 func (p *CSVParser) ParseGeometry(file io.Reader) (*geom.Geometry, error) {
-	reader := bufio.NewReader(file)
-	var csvContent strings.Builder
-	captureCSV := false
-	startMarker := "count(10HZ)"
-	endMarker := "</document_content>"
+    reader := bufio.NewReader(file)
+    
+    // Read the first line as header
+    header, err := reader.ReadString('\n')
+    if err != nil {
+        return nil, fmt.Errorf("error reading header: %v", err)
+    }
+    header = strings.TrimSpace(header)
 
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("error reading file: %v", err)
-		}
+    // Replace multiple spaces with a single comma in the header
+    header = strings.Join(strings.Fields(header), ",")
 
-		if strings.Contains(line, startMarker) {
-			captureCSV = true
-			csvContent.WriteString(line) // Include header line
-			continue
-		}
+    // Split the header
+    headerFields := strings.Split(header, ",")
+    
+    // Find latitude and longitude column indices
+    latIndex, lonIndex := -1, -1
+    for i, field := range headerFields {
+        fieldLower := strings.ToLower(field)
+        switch {
+        case strings.Contains(fieldLower, "lat") || fieldLower == "y":
+            latIndex = i
+        case strings.Contains(fieldLower, "lon") || strings.Contains(fieldLower, "lng") || fieldLower == "x":
+            lonIndex = i
+        }
+        if latIndex != -1 && lonIndex != -1 {
+            break
+        }
+    }
 
-		if strings.Contains(line, endMarker) {
-			break
-		}
+    if latIndex == -1 || lonIndex == -1 {
+        return nil, fmt.Errorf("could not find latitude and longitude columns")
+    }
 
-		if captureCSV {
-			csvContent.WriteString(line)
-		}
+    fmt.Printf("Latitude index: %d, Longitude index: %d\n", latIndex, lonIndex)
 
-		if err == io.EOF {
-			break
-		}
-	}
+    var coords []float64
+    lineCount := 0
 
-	// Detect delimiter
-	delimiter := detectDelimiter(csvContent.String())
+    // Process the rest of the file
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil && err != io.EOF {
+            return nil, fmt.Errorf("error reading line: %v", err)
+        }
 
-	csvReader := csv.NewReader(strings.NewReader(csvContent.String()))
-	csvReader.Comma = delimiter
-	csvReader.FieldsPerRecord = -1 // Allow variable number of fields
+        line = strings.TrimSpace(line)
+        if line == "" {
+            if err == io.EOF {
+                break
+            }
+            continue
+        }
 
-	// Read header
-	header, err := csvReader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("error reading CSV header: %v", err)
-	}
+        // Replace multiple spaces with a single comma
+        line = strings.Join(strings.Fields(line), ",")
 
-	// Find latitude and longitude column indices
-	latIndex, lonIndex := -1, -1
-	for i, field := range header {
-		fieldLower := strings.ToLower(field)
-		switch {
-		case strings.Contains(fieldLower, "lat") || fieldLower == "y":
-			latIndex = i
-		case strings.Contains(fieldLower, "lon") || strings.Contains(fieldLower, "lng") || fieldLower == "x":
-			lonIndex = i
-		}
-	}
+        lineCount++
+        fields := strings.Split(line, ",")
 
-	if latIndex == -1 || lonIndex == -1 {
-		return nil, fmt.Errorf("could not find latitude and longitude columns")
-	}
+        if len(fields) <= latIndex || len(fields) <= lonIndex {
+            fmt.Printf("Line %d: Insufficient fields. Expected at least %d, got %d\n", lineCount, max(latIndex, lonIndex)+1, len(fields))
+            continue
+        }
 
-	var coords []float64
-	for {
-		record, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("error reading CSV record: %v", err)
-		}
+        lat, err := strconv.ParseFloat(strings.TrimSpace(fields[latIndex]), 64)
+        if err != nil {
+            fmt.Printf("Line %d: Error parsing latitude '%s': %v\n", lineCount, fields[latIndex], err)
+            continue
+        }
 
-		if len(record) <= latIndex || len(record) <= lonIndex {
-			continue // Skip rows with insufficient data
-		}
+        lon, err := strconv.ParseFloat(strings.TrimSpace(fields[lonIndex]), 64)
+        if err != nil {
+            fmt.Printf("Line %d: Error parsing longitude '%s': %v\n", lineCount, fields[lonIndex], err)
+            continue
+        }
 
-		lat, err := strconv.ParseFloat(record[latIndex], 64)
-		if err != nil {
-			continue // Skip rows with invalid latitude
-		}
+        coords = append(coords, lon, lat)
 
-		lon, err := strconv.ParseFloat(record[lonIndex], 64)
-		if err != nil {
-			continue // Skip rows with invalid longitude
-		}
+        if lineCount <= 5 || lineCount%1000 == 0 {
+            fmt.Printf("Processed line %d: lat %v, lon %v\n", lineCount, lat, lon)
+        }
 
-		coords = append(coords, lon, lat) 
-	}
+        if err == io.EOF {
+            break
+        }
+    }
 
-	if len(coords) < 4 { // Need at least 2 points (4 float64 values) for a valid LineString
-		return nil, fmt.Errorf("not enough valid coordinates to form a LineString")
-	}
+    fmt.Printf("Total lines processed: %d\n", lineCount)
+    fmt.Printf("Total coordinates processed: %d\n", len(coords)/2)
 
-	seq := geom.NewSequence(coords, geom.DimXY)
-	lineString := geom.NewLineString(seq)
+    if len(coords) < 4 {
+        return nil, fmt.Errorf("not enough valid coordinates to form a LineString. Processed %d points", len(coords)/2)
+    }
 
-	p.lineString = &lineString
-	geometry := lineString.AsGeometry()
-	p.geometry = &geometry
+    seq := geom.NewSequence(coords, geom.DimXY)
+    lineString := geom.NewLineString(seq)
 
-	return p.geometry, nil
+    p.lineString = &lineString
+    geometry := lineString.AsGeometry()
+    p.geometry = &geometry
+
+    return p.geometry, nil
 }
 
-func detectDelimiter(content string) rune {
-    // Potential delimiters to check
-    delimiters := []rune{',', '\t', ';', '|'}
-    
-    lines := strings.Split(content, "\n")
-    if len(lines) < 2 {
-        return ',' // Default to comma if not enough lines
-    }
+func detectDelimiter(sampleLines []string) rune {
+    delimiters := []rune{',', '\t', ';', '|', ' '}
+    counts := make(map[rune]int)
 
-    // Use the first few lines for detection
-    sampleSize := min(5, len(lines))
-    var bestDelimiter rune
-    var maxConsistentColumns int
-
-    for _, delimiter := range delimiters {
-        consistentColumns := 0
-        columnCount := -1
-
-        for i := 0; i < sampleSize; i++ {
-            fields := strings.Split(lines[i], string(delimiter))
-            if len(fields) > 1 {
-                if columnCount == -1 {
-                    columnCount = len(fields)
-                    consistentColumns++
-                } else if len(fields) == columnCount {
-                    consistentColumns++
-                }
-            }
-        }
-
-        if consistentColumns > maxConsistentColumns {
-            maxConsistentColumns = consistentColumns
-            bestDelimiter = delimiter
+    for _, line := range sampleLines {
+        for _, d := range delimiters {
+            counts[d] += strings.Count(line, string(d))
         }
     }
 
-    if bestDelimiter == 0 {
-        return ',' // Default to comma if no clear delimiter found
+    bestDelimiter := ','
+    maxCount := 0
+    for d, count := range counts {
+        if count > maxCount {
+            maxCount = count
+            bestDelimiter = d
+        }
     }
 
     return bestDelimiter
 }
-
-func min(a, b int) int {
-    if a < b {
-        return a
-    }
-    return b
-}
-
-
