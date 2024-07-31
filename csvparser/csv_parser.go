@@ -15,6 +15,9 @@ type CSVParser struct {
 	geometry   *geom.Geometry
 }
 
+// ParseGeometry reads a CSV-like file and extracts geographic coordinates.
+// It handles various delimiter types and space-separated values.
+// Returns a geometry object or an error if parsing fails.
 func (p *CSVParser) ParseGeometry(file io.Reader) (*geom.Geometry, error) {
     reader := bufio.NewReader(file)
     
@@ -25,20 +28,28 @@ func (p *CSVParser) ParseGeometry(file io.Reader) (*geom.Geometry, error) {
     }
     header = strings.TrimSpace(header)
 
-    // Replace multiple spaces with a single comma in the header
-    header = strings.Join(strings.Fields(header), ",")
+    // Detect delimiter
+    delimiter := detectDelimiter([]string{header})
+    fmt.Printf("Detected delimiter: %q\n", delimiter)
 
-    // Split the header
-    headerFields := strings.Split(header, ",")
+    var headerFields []string
+    if delimiter == ' ' {
+        // For space-separated values, replace multiple spaces with a single comma.
+        header = strings.Join(strings.Fields(header), ",")
+        headerFields = strings.Split(header, ",")
+    } else {
+        headerFields = strings.Split(header, string(delimiter))
+    }
     
-    // Find latitude and longitude column indices
+    // Find latitude and longitude column indices.
+	// Unsure of the naming of these columns so test for multiple spellings.
     latIndex, lonIndex := -1, -1
     for i, field := range headerFields {
         fieldLower := strings.ToLower(field)
         switch {
-        case strings.Contains(fieldLower, "lat") || fieldLower == "y":
+        case fieldLower == "lat" || fieldLower == "latitude" || fieldLower == "y":
             latIndex = i
-        case strings.Contains(fieldLower, "lon") || strings.Contains(fieldLower, "lng") || fieldLower == "x":
+        case fieldLower == "lon" || fieldLower == "longitude" || fieldLower == "lng" || fieldLower == "x":
             lonIndex = i
         }
         if latIndex != -1 && lonIndex != -1 {
@@ -70,42 +81,39 @@ func (p *CSVParser) ParseGeometry(file io.Reader) (*geom.Geometry, error) {
             continue
         }
 
-        // Replace multiple spaces with a single comma
-        line = strings.Join(strings.Fields(line), ",")
+        var fields []string
+        if delimiter == ' ' {
+			// The files made with DJI-GO 4, exporting flight paths to csv show an odd
+			// delimiter strategy. They are using spaces, but not the same number of spaces
+			// between values. So, replace multiple spaces with a single comma and split the 
+			// string so that we definitely only have fields with values.
+            line = strings.Join(strings.Fields(line), ",")
+            fields = strings.Split(line, ",")
+        } else {
+            fields = strings.Split(line, string(delimiter))
+        }
 
         lineCount++
-        fields := strings.Split(line, ",")
 
         if len(fields) <= latIndex || len(fields) <= lonIndex {
-            fmt.Printf("Line %d: Insufficient fields. Expected at least %d, got %d\n", lineCount, max(latIndex, lonIndex)+1, len(fields))
+            //fmt.Printf("Line %d: Insufficient fields. Expected at least %d, got %d\n", lineCount, max(latIndex, lonIndex)+1, len(fields))
             continue
         }
 
         lat, err := strconv.ParseFloat(strings.TrimSpace(fields[latIndex]), 64)
         if err != nil {
-            fmt.Printf("Line %d: Error parsing latitude '%s': %v\n", lineCount, fields[latIndex], err)
+            //fmt.Printf("Line %d: Error parsing latitude '%s': %v\n", lineCount, fields[latIndex], err)
             continue
         }
 
         lon, err := strconv.ParseFloat(strings.TrimSpace(fields[lonIndex]), 64)
         if err != nil {
-            fmt.Printf("Line %d: Error parsing longitude '%s': %v\n", lineCount, fields[lonIndex], err)
+            //fmt.Printf("Line %d: Error parsing longitude '%s': %v\n", lineCount, fields[lonIndex], err)
             continue
         }
 
         coords = append(coords, lon, lat)
-
-        if lineCount <= 5 || lineCount%1000 == 0 {
-            fmt.Printf("Processed line %d: lat %v, lon %v\n", lineCount, lat, lon)
-        }
-
-        if err == io.EOF {
-            break
-        }
     }
-
-    fmt.Printf("Total lines processed: %d\n", lineCount)
-    fmt.Printf("Total coordinates processed: %d\n", len(coords)/2)
 
     if len(coords) < 4 {
         return nil, fmt.Errorf("not enough valid coordinates to form a LineString. Processed %d points", len(coords)/2)
@@ -120,6 +128,7 @@ func (p *CSVParser) ParseGeometry(file io.Reader) (*geom.Geometry, error) {
 
     return p.geometry, nil
 }
+
 
 func detectDelimiter(sampleLines []string) rune {
     delimiters := []rune{',', '\t', ';', '|', ' '}
