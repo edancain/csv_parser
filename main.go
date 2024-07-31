@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"https://github.com/edancain/csv_parser"
+	"csv_parser/csvparser"
 )
 
 func main() {
@@ -37,17 +37,8 @@ func main() {
 		return
 	}
 
-	// Print some information about the parsed geometry
-	fmt.Printf("Geometry type: %s\n", geometry.GeometryType())
-	fmt.Printf("Number of points: %d\n", geometry.NumPoints())
-	fmt.Printf("Bounding box: %v\n", geometry.Envelope())
-
-	// If it's a LineString, we can get more specific information
-	if ls, ok := geometry.AsLineString(); ok {
-		fmt.Printf("Length: %.2f\n", ls.Length())
-		startPoint := ls.StartPoint()
-		endPoint := ls.EndPoint()
-		fmt.Printf("Start point: (%.6f, %.6f)\n", startPoint.X(), startPoint.Y())
-		fmt.Printf("End point: (%.6f, %.6f)\n", endPoint.X(), endPoint.Y())
+	if geometry != nil{
+		fmt.Println("Success")
 	}
+	
 }
