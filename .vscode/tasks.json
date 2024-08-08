@@ -4,7 +4,7 @@
         {
             "label": "go-prelaunchtasks",
             "type": "shell",
-            "command": "go mod tidy && go fmt ./... && golangci-lint run",
+            "command": "go mod tidy && go fmt ./... && golangci-lint run -c .golangci.yml",
             "group": "build",
             "problemMatcher": [
                 "$go"

@@ -1,0 +1,214 @@
+# Options for analysis running.
+run:
+  # Number of operating system threads (`GOMAXPROCS`) that can execute golangci-lint simultaneously.
+  # If it is explicitly set to 0 (i.e. not the default) then golangci-lint will automatically set the value to match Linux container CPU quota.
+  # Default: the number of logical CPUs in the machine
+  concurrency: 4
+  # Timeout for analysis, e.g. 30s, 5m.
+  # Default: 1m
+  timeout: 5m
+  # Include test files or not.
+  # Default: true
+  tests: false
+  # List of build tags, all linters use it.
+  # Default: []
+  build-tags:
+    - local
+  # Allow multiple parallel golangci-lint instances running.
+  # If false, golangci-lint acquires file lock on start.
+  # Default: false
+  allow-parallel-runners: true
+  # Allow multiple golangci-lint instances running, but serialize them around a lock.
+  # If false, golangci-lint exits with an error if it fails to acquire file lock on start.
+  # Default: false
+  # allow-serial-runners: true
+
+linters:
+  # Disable all linters.
+  # Default: false
+  disable-all: true
+  # Enable specific linter
+  # https://golangci-lint.run/usage/linters/#enabled-by-default
+  enable:
+    # Default linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+
+    # Additive linters
+    - bodyclose # checks whether HTTP response body is closed successfully.
+    - containedctx # containedctx is a linter that detects struct contained context.Context field
+    - dogsled # Checks assignments with too many blank identifiers (e.g. x, , , _, := f())
+    - dupl # Tool for code clone detection
+    - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
+    - exportloopref # checks for pointers to enclosing loop variables
+    - exhaustive # check exhaustiveness of enum switch statements
+    - forbidigo # Forbids identifiers
+    - gochecknoinits
+    - gocognit # Computes and checks the cognitive complexity of functions
+    - goconst # Finds repeated strings that could be replaced by a constant
+    - gocritic # Provides diagnostics that check for bugs, performance and style issues.
+    - gofmt # Gofmt checks whether code was gofmt-ed.
+    - goimports # Check import statements are formatted according to the 'goimport' command.
+    - mnd # An analyzer to detect magic numbers.
+    - gocyclo # Computes and checks the cyclomatic complexity of functions
+    - gosec # Inspects source code for security problems.
+    - ireturn # Accept Interfaces, Return Concrete Types
+    # - lll # Reports long lines
+    - makezero # Finds slice declarations with non-zero initial length
+    - misspell # Finds commonly misspelled English words in comments
+    - nakedret # Finds naked returns in functions greater than a specified function length
+    - nestif # Reports deeply nested if statements
+    - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
+    - nilnil # Checks that there is no simultaneous return of nil error and an invalid value.
+    # - nlreturn # checks for a new line before return and branch statements to increase code clarity
+    - noctx # noctx finds sending http request without context.Context
+    - nolintlint # Reports ill-formed or insufficient nolint directives
+    - prealloc # Finds slice declarations that could potentially be pre-allocated
+    - predeclared # find code that shadows one of Go's predeclared identifiers
+    - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint
+    - stylecheck # Stylecheck is a replacement for golint
+    - tagliatelle # Checks the struct tags.
+    - thelper
+    - tparallel
+    - unconvert # Remove unnecessary type conversions
+    - unparam # Reports unused function parameters
+    - whitespace # Tool for detection of leading and trailing whitespace
+    # - wrapcheck # Checks that errors returned from external packages are wrapped
+    # - wsl # Whitespace Linter - Forces you to use empty lines!
+    - godot # Check if comments end in a period.
+
+  # Run only fast linters from enabled linters set (first run won't be fast)
+  # Default: false
+  fast: false
+
+linters-settings:
+  errcheck:
+    # report about not checking of errors in type assetions: `a := b.(MyStruct)`;
+    # default is false: such cases aren't reported by default.
+    check-type-assertions: true
+
+    # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
+    # default is false: such cases aren't reported by default.
+    check-blank: false
+
+    # To disable the errcheck built-in exclude list.
+    # See `-excludeonly` option in https://github.com/kisielk/errcheck#excluding-functions for details.
+    # Default: false
+    disable-default-exclusions: false
+
+    # List of functions to exclude from checking, where each entry is a single function to exclude.
+    # See https://github.com/kisielk/errcheck#excluding-functions for details.
+    exclude-functions:
+      - (net/http.ResponseWriter).Write
+      - (github.com/go-kit/log.Logger).Log
+
+  goconst:
+    # Ignore test files.
+    # Default: false
+    ignore-tests: true
+
+  revive:
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#var-naming
+      - name: var-naming
+        disabled: true
+
+  stylecheck:
+    # STxxxx checks in https://staticcheck.io/docs/configuration/options/#checks
+    # Default: ["*"]
+    checks: ["all", "-ST1003"]
+
+  whitespace:
+    # Enforces newlines (or comments) after every multi-line function signature.
+    # Default: false
+    multi-func: true
+
+  gocyclo:
+    # Minimal code complexity to report.
+    # Default: 30 (but we recommend 10-20)
+    min-complexity: 15
+
+  gocognit:
+  # Minimal code complexity to report.
+  # Default: 30 (but we recommend 10-20)
+  min-complexity: 10
+
+  exhaustive:
+    # Presence of "default" case in switch statements satisfies exhaustiveness,
+    # even if all enum members are not listed.
+    # Default: false
+    default-signifies-exhaustive: true
+
+  wrapcheck:
+  # An array of strings that specify substrings of signatures to ignore.
+  # If this set, it will override the default set of ignored signatures.
+  # See https://github.com/tomarrell/wrapcheck#configuration for more information.
+  # Default: [".Errorf(", "errors.New(", "errors.Unwrap(", ".Wrap(", ".Wrapf(", ".WithMessage(", ".WithMessagef(", ".WithStack("]
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - errors.Unwrap(
+      - .Wrap(
+      - .Wrapf(
+      - .WithMessage(
+      - .WithMessagef(
+      - .WithStack(
+      - status.Error(
+    ignorePackageGlobs:
+      - encoding/*
+      - github.com/pkg/*
+  godot:
+      # Comments to be checked: `declarations`, `toplevel`, or `all`.
+      # Default: declarations
+      scope: declarations
+      # List of regexps for excluding particular comment lines from check.
+      # Default: []
+      exclude:
+        # Exclude todo and fixme comments.
+        - "^fixme:"
+        - "^todo:"
+        - "TODO:"
+        - "=$" # spacer comment
+        - "-$" # spacer comment
+        - "^ (\\w+)$" # Single word comment
+      # Check that each sentence ends with a period.
+      # Default: true
+      period: true
+      # Check that each sentence starts with a capital letter.
+      # Default: false
+      capital: true
+  
+  ireturn:
+    allow:
+      - anon
+      - error
+      - empty
+      - stdlib
+      - FileParser  # This line allows FileParser interface to be returned
+
+issues:
+
+  # Which dirs to exclude: issues from them won't be reported.
+  # Can use regexp here: `generated.*`, regexp is applied on full path,
+  # including the path prefix if one is set.
+  # Default dirs are skipped independently of this option's value (see exclude-dirs-use-default).
+  # "/" will be replaced by current OS file path separator to properly work on Windows.
+  # Default: []
+  exclude-dirs:
+    - api 
+    - bin # Binary, waste of CPU... 
+    - gen # Generated code, should'nt modify.
+  # Which files to exclude: they will be analyzed, but issues from them won't be reported.
+  # There is no need to include all autogenerated files,
+  # we confidently recognize autogenerated files.
+  # If it's not, please let us know.
+  # "/" will be replaced by current OS file path separator to properly work on Windows.
+  # Default: []
+  exclude-files:
+    - ".*\\.pb\\.go"
+    - ".*\\.gen\\.go"
