@@ -152,6 +152,7 @@ func createGeometry(coords []float64) (*geom.Geometry, error) {
 	}
 
 	seq := geom.NewSequence(coords, geom.DimXY)
+	fmt.Printf("Number of coordinates parsed: %d\n", seq.Length())
 	lineString := geom.NewLineString(seq)
 	geometry := lineString.AsGeometry()
 

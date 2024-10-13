@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"csv_parser/csvparser"
-	"csv_parser/kmlparser"
 )
 
 func main() {
@@ -30,28 +29,6 @@ func main() {
 
 	// Parse the geometry
 	geometry, err := parser.ParseGeometry(file)
-	if err != nil {
-		return
-	}
-
-	if geometry == nil {
-		return
-	}
-
-	filePath = filepath.Join(cwd, "test_files", "10.kmz")
-
-	// Open the file
-	kmlfile, err := os.Open(filePath)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	// Create a new CSVParser
-	kmlParser := &kmlparser.KMLKMZParser{}
-
-	// Parse the geometry
-	geometry, err = kmlParser.ParseGeometry(kmlfile)
 	if err != nil {
 		return
 	}
