@@ -1,3 +1,7 @@
+# Simple CSV parser looking for telemetry data
+
+## Demonstrates use of Golang, Github Actions, Linting
+
 The .golangci.yml file is used to customize and control the behavior of golangci-lint when it analyzes the Go code herein.
 The file contains:
 
